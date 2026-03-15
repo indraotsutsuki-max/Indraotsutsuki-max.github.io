@@ -821,42 +821,63 @@
 
   async function generateImage() {
     const prompt = document.getElementById('promptInput').value.trim();
-    if(!prompt) {
-      alert('Please enter a prompt first!');
-      return;
-    }
+    if(!prompt) { alert('Please enter a prompt first!'); return; }
 
     const neg = document.getElementById('negPrompt').value;
     const styleAdd = stylePrompts[selectedStyle] || '';
     const ratio = document.getElementById('ratio').value;
     const [w, h] = ratio.split('x');
-    const steps = document.getElementById('quality').value;
-    const cfg = document.getElementById('cfgScale').value;
-
-    const fullPrompt = `${prompt}, ${styleAdd}`;
     const seed = Math.floor(Math.random() * 9999999);
+    const fullPrompt = `${prompt}, ${styleAdd}`;
 
-    // Show loader
     document.getElementById('outputPlaceholder').style.display = 'none';
     document.getElementById('outputImage').style.display = 'none';
     document.getElementById('resultActions').style.display = 'none';
     document.getElementById('loader').classList.add('show');
 
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${w}&height=${h}&seed=${seed}&steps=${steps}&cfg=${cfg}&negative=${encodeURIComponent(neg || 'blurry, low quality, bad anatomy')}&nologo=true`;
+    const loaderText = document.querySelector('.loader-text');
+    let dots = 0;
+    const dotTimer = setInterval(() => {
+      dots = (dots + 1) % 4;
+      const msgs = ['GENERATING', 'AI DRAWING', 'ALMOST DONE', 'FINALIZING'];
+      loaderText.textContent = msgs[Math.floor(dots)] + '...';
+    }, 3000);
 
-    const img = document.getElementById('outputImage');
-    img.onload = () => {
-      document.getElementById('loader').classList.remove('show');
+    // Use fetch with a long timeout instead of img.src
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${w}&height=${h}&seed=${seed}&nologo=true&negative=${encodeURIComponent(neg || 'blurry, low quality')}`;
+
+    try {
+      // Fetch with 90 second timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 90000);
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (!response.ok) throw new Error('Failed');
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+
+      clearInterval(dotTimer);
+      const img = document.getElementById('outputImage');
+      img.src = objectUrl;
       img.style.display = 'block';
+      document.getElementById('loader').classList.remove('show');
       document.getElementById('resultActions').style.display = 'flex';
-      currentImageUrl = url;
-    };
-    img.onerror = () => {
+      currentImageUrl = objectUrl;
+
+    } catch(e) {
+      clearInterval(dotTimer);
       document.getElementById('loader').classList.remove('show');
       document.getElementById('outputPlaceholder').style.display = 'flex';
-      document.getElementById('outputPlaceholder').innerHTML = '<div style="text-align:center;color:#ff6b6b"><div style="font-size:2rem">⚠️</div><p style="margin-top:8px">Generation failed.<br>Check internet & try again.</p></div>';
-    };
-    img.src = url;
+      document.getElementById('outputPlaceholder').innerHTML = `
+        <div style="text-align:center;color:#ff6b6b;padding:20px">
+          <div style="font-size:2rem">⚠️</div>
+          <p style="margin-top:8px;font-size:0.85rem">Generation timed out.<br>Pollinations is busy — please wait 30 seconds and try again!</p>
+          <button onclick="generateImage()" style="margin-top:14px;padding:10px 20px;background:var(--pink);border:none;border-radius:10px;color:white;font-family:'Orbitron',monospace;font-size:0.75rem;cursor:pointer;letter-spacing:1px">🔄 RETRY</button>
+        </div>`;
+    }
   }
 
   function downloadImage() {
