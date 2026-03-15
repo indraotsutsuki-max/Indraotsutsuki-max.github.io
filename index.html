@@ -586,6 +586,27 @@
         <div class="card">
           <div class="card-title">DESCRIBE YOUR ANIME</div>
 
+          <!-- IMAGE REFERENCE UPLOAD -->
+          <label>REFERENCE IMAGE — Upload your photo (optional)</label>
+          <div id="uploadZone" onclick="document.getElementById('refImageInput').click()" style="border:2px dashed rgba(0,245,255,0.3);border-radius:14px;padding:18px;text-align:center;cursor:pointer;background:rgba(0,245,255,0.04);transition:all 0.3s;position:relative">
+            <div id="uploadPlaceholder">
+              <div style="font-size:2rem">📸</div>
+              <div style="font-size:0.8rem;color:var(--cyan);margin-top:6px;font-family:'Orbitron',monospace;letter-spacing:1px">TAP TO UPLOAD IMAGE</div>
+              <div style="font-size:0.72rem;color:var(--muted);margin-top:4px">Use your photo as anime reference</div>
+            </div>
+            <div id="uploadPreviewWrap" style="display:none;position:relative">
+              <img id="uploadPreview" style="max-height:120px;border-radius:10px;max-width:100%">
+              <button onclick="clearRefImage(event)" style="position:absolute;top:-8px;right:-8px;background:var(--pink);border:none;border-radius:50%;width:24px;height:24px;color:white;cursor:pointer;font-size:0.8rem;line-height:24px">x</button>
+              <div style="font-size:0.72rem;color:var(--cyan);margin-top:6px">Reference image loaded!</div>
+            </div>
+          </div>
+          <input type="file" id="refImageInput" accept="image/*" style="display:none" onchange="handleRefImage(event)">
+          <div id="strengthRow" style="display:none">
+            <label>REFERENCE STRENGTH — <span id="strengthVal">60</span>%</label>
+            <input type="range" min="10" max="95" value="60" oninput="document.getElementById('strengthVal').textContent=this.value" id="refStrength">
+            <div class="range-labels"><span>Low (more creative)</span><span>High (closer to photo)</span></div>
+          </div>
+
           <label>PROMPT — What do you want to create?</label>
           <textarea id="promptInput" placeholder="e.g. A beautiful anime girl with silver hair, cherry blossoms falling, soft lighting, detailed eyes, Ghibli style..."></textarea>
 
@@ -787,7 +808,33 @@
 <script>
   let selectedStyle = 'anime';
   let currentImageUrl = '';
+  let refImageBase64 = null;
   let gallery = JSON.parse(localStorage.getItem('animeforge_gallery') || '[]');
+
+  function handleRefImage(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      refImageBase64 = e.target.result;
+      document.getElementById('uploadPlaceholder').style.display = 'none';
+      document.getElementById('uploadPreviewWrap').style.display = 'block';
+      document.getElementById('uploadPreview').src = refImageBase64;
+      document.getElementById('strengthRow').style.display = 'block';
+      document.getElementById('uploadZone').style.borderColor = 'var(--cyan)';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearRefImage(e) {
+    e.stopPropagation();
+    refImageBase64 = null;
+    document.getElementById('uploadPlaceholder').style.display = 'block';
+    document.getElementById('uploadPreviewWrap').style.display = 'none';
+    document.getElementById('strengthRow').style.display = 'none';
+    document.getElementById('uploadZone').style.borderColor = 'rgba(0,245,255,0.3)';
+    document.getElementById('refImageInput').value = '';
+  }
 
   const stylePrompts = {
     anime: 'anime style, high quality, detailed, vibrant colors',
@@ -843,21 +890,44 @@
       loaderText.textContent = msgs[Math.floor(dots)] + '...';
     }, 3000);
 
-    // Use fetch with a long timeout instead of img.src
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${w}&height=${h}&seed=${seed}&nologo=true&negative=${encodeURIComponent(neg || 'blurry, low quality')}`;
-
     try {
-      // Fetch with 90 second timeout
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 90000);
+      let objectUrl;
 
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeout);
+      if (refImageBase64) {
+        // Image-to-image: send ref image + prompt to Pollinations
+        const strength = document.getElementById('refStrength').value / 100;
+        const base64Data = refImageBase64.split(',')[1];
+        const mimeType = refImageBase64.split(';')[0].split(':')[1];
+        const byteChars = atob(base64Data);
+        const byteArr = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+        const imgBlob = new Blob([byteArr], { type: mimeType });
 
-      if (!response.ok) throw new Error('Failed');
+        const formData = new FormData();
+        formData.append('image', imgBlob, 'reference.jpg');
+        formData.append('prompt', fullPrompt);
+        formData.append('strength', strength);
+        formData.append('width', w);
+        formData.append('height', h);
+        formData.append('seed', seed);
+        formData.append('nologo', 'true');
 
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
+        const response = await fetch('https://image.pollinations.ai/prompt/' + encodeURIComponent(fullPrompt) + '?width=' + w + '&height=' + h + '&seed=' + seed + '&nologo=true&image=' + encodeURIComponent(refImageBase64.split(',')[1]) + '&strength=' + strength, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (!response.ok) throw new Error('Failed');
+        const blob = await response.blob();
+        objectUrl = URL.createObjectURL(blob);
+      } else {
+        // Text-to-image normal
+        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${w}&height=${h}&seed=${seed}&nologo=true&negative=${encodeURIComponent(neg || 'blurry, low quality')}`;
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (!response.ok) throw new Error('Failed');
+        const blob = await response.blob();
+        objectUrl = URL.createObjectURL(blob);
+      }
 
       clearInterval(dotTimer);
       const img = document.getElementById('outputImage');
