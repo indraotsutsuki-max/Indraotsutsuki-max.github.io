@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnimeForge AI — Create Anime Art & Video</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pink: #ff2d78;
+    --cyan: #00f5ff;
+    --purple: #9d00ff;
+    --dark: #05050f;
+    --darker: #020208;
+    --card: rgba(255,255,255,0.04);
+    --border: rgba(255,45,120,0.25);
+    --text: #e8e0ff;
+    --muted: #7a6fa0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--dark);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 10%, rgba(157,0,255,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 80% 80%, rgba(255,45,120,0.1) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 50% 50%, rgba(0,245,255,0.05) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Grid overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,245,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,245,255,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* HEADER */
+  header {
+    padding: 28px 0 20px;
+    border-bottom: 1px solid var(--border);
+    position: relative; z-index: 10;
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.5rem;
+    font-weight: 900;
+    letter-spacing: 2px;
+    background: linear-gradient(135deg, var(--pink), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: none;
+  }
+
+  .logo span {
+    font-weight: 400;
+    opacity: 0.7;
+    font-size: 0.85rem;
+    display: block;
+    letter-spacing: 4px;
+    background: linear-gradient(90deg, var(--muted), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .badge {
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    color: white;
+    font-size: 0.7rem;
+    font-family: 'Orbitron', monospace;
+    padding: 5px 14px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,45,120,0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(255,45,120,0); }
+  }
+
+  /* HERO */
+  .hero {
+    text-align: center;
+    padding: 60px 0 40px;
+    position: relative;
+  }
+
+  .hero-title {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 900;
+    line-height: 1.1;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, #fff 0%, var(--cyan) 40%, var(--pink) 80%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero-sub {
+    font-size: 1rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin: 36px 0 32px;
+    flex-wrap: wrap;
+  }
+
+  .tab {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    padding: 12px 28px;
+    border-radius: 40px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.3s;
+    backdrop-filter: blur(10px);
+  }
+
+  .tab:hover {
+    border-color: var(--pink);
+    color: var(--pink);
+  }
+
+  .tab.active {
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    border-color: transparent;
+    color: white;
+    box-shadow: 0 0 24px rgba(255,45,120,0.4);
+  }
+
+  /* PANELS */
+  .panel { display: none; }
+  .panel.active { display: block; animation: fadeUp 0.4s ease; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* CARD */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    backdrop-filter: blur(20px);
+    margin-bottom: 20px;
+  }
+
+  .card-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 3px;
+    color: var(--cyan);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .card-title::before {
+    content: '';
+    width: 20px;
+    height: 2px;
+    background: var(--cyan);
+    display: inline-block;
+  }
+
+  /* FORM ELEMENTS */
+  textarea, input[type="text"], select {
+    width: 100%;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 0.95rem;
+    padding: 14px 18px;
+    outline: none;
+    transition: border-color 0.3s;
+    resize: none;
+  }
+
+  textarea:focus, input:focus, select:focus {
+    border-color: var(--pink);
+    box-shadow: 0 0 0 3px rgba(255,45,120,0.1);
+  }
+
+  textarea { min-height: 110px; }
+
+  select option { background: #1a0a2e; }
+
+  label {
+    display: block;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    margin-top: 18px;
+  }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  /* STYLES GRID */
+  .style-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .style-btn {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 10px 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .style-btn .icon { font-size: 1.4rem; display: block; margin-bottom: 4px; }
+
+  .style-btn:hover, .style-btn.active {
+    border-color: var(--pink);
+    color: var(--pink);
+    background: rgba(255,45,120,0.1);
+    transform: translateY(-2px);
+  }
+
+  /* GENERATE BUTTON */
+  .btn-generate {
+    width: 100%;
+    margin-top: 24px;
+    padding: 18px;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: white;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--pink) 0%, var(--purple) 100%);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .btn-generate:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(255,45,120,0.4);
+  }
+
+  .btn-generate:active { transform: translateY(0); }
+
+  .btn-generate::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent, rgba(255,255,255,0.15), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.5s;
+  }
+
+  .btn-generate:hover::after { transform: translateX(100%); }
+
+  /* OUTPUT AREA */
+  .output-area {
+    min-height: 340px;
+    border: 1px dashed rgba(255,45,120,0.2);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.2);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .output-placeholder {
+    text-align: center;
+    color: var(--muted);
+  }
+
+  .output-placeholder .big-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.4; }
+  .output-placeholder p { font-size: 0.85rem; letter-spacing: 1px; }
+
+  .output-image {
+    width: 100%;
+    border-radius: 16px;
+    display: none;
+  }
+
+  /* LOADING */
+  .loader {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .loader.show { display: flex; }
+
+  .loader-ring {
+    width: 60px;
+    height: 60px;
+    border: 3px solid rgba(255,45,120,0.2);
+    border-top-color: var(--pink);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loader-text {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 3px;
+    color: var(--pink);
+    animation: blink 1.5s infinite;
+  }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* RESULT ACTIONS */
+  .result-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .btn-sm {
+    flex: 1;
+    padding: 12px;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    transition: all 0.2s;
+  }
+
+  .btn-sm:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+  }
+
+  /* VIDEO SECTION */
+  .video-info {
+    background: linear-gradient(135deg, rgba(157,0,255,0.1), rgba(0,245,255,0.05));
+    border: 1px solid rgba(157,0,255,0.3);
+    border-radius: 16px;
+    padding: 24px;
+    text-align: center;
+  }
+
+  .video-info h3 {
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem;
+    color: var(--cyan);
+    margin-bottom: 10px;
+  }
+
+  .video-info p { font-size: 0.85rem; color: var(--muted); line-height: 1.7; }
+
+  .free-tools {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+    margin-top: 20px;
+  }
+
+  .tool-card {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 18px;
+    transition: all 0.3s;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+
+  .tool-card:hover {
+    border-color: var(--purple);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(157,0,255,0.2);
+  }
+
+  .tool-card .tool-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.85rem;
+    color: var(--cyan);
+    margin-bottom: 6px;
+  }
+
+  .tool-card .tool-desc { font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+  .tool-card .tool-tag {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 0.65rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: rgba(255,45,120,0.15);
+    color: var(--pink);
+    letter-spacing: 1px;
+  }
+
+  /* PROMPT IDEAS */
+  .prompt-ideas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .idea-chip {
+    background: rgba(0,245,255,0.08);
+    border: 1px solid rgba(0,245,255,0.15);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 0.75rem;
+    color: var(--cyan);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .idea-chip:hover {
+    background: rgba(0,245,255,0.18);
+    transform: scale(1.05);
+  }
+
+  /* FOOTER */
+  footer {
+    margin-top: 60px;
+    padding: 30px 0;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+    position: relative; z-index: 1;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--darker); }
+  ::-webkit-scrollbar-thumb { background: var(--pink); border-radius: 3px; }
+
+  /* Range input */
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    outline: none;
+    padding: 0;
+    margin-top: 8px;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--pink);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(255,45,120,0.5);
+  }
+
+  .range-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* History */
+  .history-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .history-item {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .history-item:hover { border-color: var(--pink); transform: scale(1.03); }
+  .history-item img { width: 100%; height: 120px; object-fit: cover; display: block; }
+  .history-item .h-label {
+    padding: 6px 8px;
+    font-size: 0.65rem;
+    color: var(--muted);
+    background: rgba(0,0,0,0.6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="header-inner">
+      <div class="logo">
+        ANIMEFORGE
+        <span>AI · GENERATOR · FREE</span>
+      </div>
+      <div class="badge">FREE · INDIA ✓</div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <div class="hero">
+    <h1 class="hero-title">Create Anime with AI</h1>
+    <p class="hero-sub">Generate stunning anime art — completely free, no sign-up needed</p>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('image')">🎨 IMAGE GENERATOR</div>
+    <div class="tab" onclick="switchTab('video')">🎬 VIDEO TOOLS</div>
+    <div class="tab" onclick="switchTab('history')">🗂️ MY GALLERY</div>
+  </div>
+
+  <!-- IMAGE TAB -->
+  <div class="panel active" id="tab-image">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <div class="card">
+          <div class="card-title">DESCRIBE YOUR ANIME</div>
+
+          <label>PROMPT — What do you want to create?</label>
+          <textarea id="promptInput" placeholder="e.g. A beautiful anime girl with silver hair, cherry blossoms falling, soft lighting, detailed eyes, Ghibli style..."></textarea>
+
+          <div class="card-title" style="margin-top:18px">QUICK IDEAS</div>
+          <div class="prompt-ideas">
+            <div class="idea-chip" onclick="addPrompt('anime girl, moonlight, cyberpunk city, neon reflections')">🌙 Cyberpunk</div>
+            <div class="idea-chip" onclick="addPrompt('samurai warrior, cherry blossoms, sunset, epic cinematic')">⚔️ Samurai</div>
+            <div class="idea-chip" onclick="addPrompt('magical girl transformation, sparkles, colorful, Studio Madhouse style')">✨ Magical Girl</div>
+            <div class="idea-chip" onclick="addPrompt('anime village, Ghibli style, cozy, warm lighting, nature')">🏡 Ghibli</div>
+            <div class="idea-chip" onclick="addPrompt('dark fantasy anime knight, dramatic lighting, epic battle')">🗡️ Dark Fantasy</div>
+            <div class="idea-chip" onclick="addPrompt('anime beach scene, summer, friends, pastel colors')">🏖️ Summer</div>
+          </div>
+
+          <label>NEGATIVE PROMPT — What to avoid?</label>
+          <input type="text" id="negPrompt" placeholder="blurry, low quality, bad anatomy, watermark...">
+
+          <label>STYLE</label>
+          <div class="style-grid">
+            <div class="style-btn active" onclick="selectStyle(this,'anime')"><span class="icon">⛩️</span>Anime</div>
+            <div class="style-btn" onclick="selectStyle(this,'ghibli')"><span class="icon">🌿</span>Ghibli</div>
+            <div class="style-btn" onclick="selectStyle(this,'manga')"><span class="icon">📖</span>Manga</div>
+            <div class="style-btn" onclick="selectStyle(this,'chibi')"><span class="icon">🎀</span>Chibi</div>
+            <div class="style-btn" onclick="selectStyle(this,'dark')"><span class="icon">🌑</span>Dark</div>
+            <div class="style-btn" onclick="selectStyle(this,'mecha')"><span class="icon">🤖</span>Mecha</div>
+          </div>
+
+          <div class="grid-2">
+            <div>
+              <label>ASPECT RATIO</label>
+              <select id="ratio">
+                <option value="512x512">1:1 Square</option>
+                <option value="512x768" selected>2:3 Portrait</option>
+                <option value="768x512">3:2 Landscape</option>
+                <option value="512x896">9:16 Vertical</option>
+              </select>
+            </div>
+            <div>
+              <label>QUALITY</label>
+              <select id="quality">
+                <option value="20">Fast</option>
+                <option value="30" selected>Balanced</option>
+                <option value="50">Best</option>
+              </select>
+            </div>
+          </div>
+
+          <label>CREATIVITY — <span id="cfgVal">7</span></label>
+          <input type="range" min="1" max="15" value="7" oninput="document.getElementById('cfgVal').textContent=this.value" id="cfgScale">
+          <div class="range-labels"><span>Realistic</span><span>Creative</span></div>
+
+          <button class="btn-generate" onclick="generateImage()">⚡ GENERATE ANIME ART</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="card-title">OUTPUT</div>
+          <div class="output-area" id="outputArea">
+            <div class="output-placeholder" id="outputPlaceholder">
+              <div class="big-icon">🎨</div>
+              <p>Your anime art will<br>appear here</p>
+            </div>
+            <div class="loader" id="loader">
+              <div class="loader-ring"></div>
+              <div class="loader-text">GENERATING...</div>
+            </div>
+            <img class="output-image" id="outputImage" alt="Generated anime">
+          </div>
+          <div class="result-actions" id="resultActions" style="display:none">
+            <button class="btn-sm" onclick="downloadImage()">⬇ DOWNLOAD</button>
+            <button class="btn-sm" onclick="regenerate()">🔄 REGENERATE</button>
+            <button class="btn-sm" onclick="saveToGallery()">💾 SAVE</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">HOW IT WORKS</div>
+          <p style="font-size:0.82rem;color:var(--muted);line-height:1.8">
+            This tool uses <strong style="color:var(--cyan)">Pollinations.AI</strong> — a completely free AI image API that works worldwide including India. No sign-up, no credit card, no limits.<br><br>
+            For even more power, you can also try <strong style="color:var(--pink)">Stable Diffusion</strong> locally on your PC.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIDEO TAB -->
+  <div class="panel" id="tab-video">
+    <div class="card">
+      <div class="card-title">FREE ANIME VIDEO TOOLS — WORKS IN INDIA</div>
+
+      <div class="video-info">
+        <h3>🎬 True AI Anime Video Generation is Here!</h3>
+        <p>While Sora is not available in India, these free tools let you create amazing anime videos and animations. Each one works without a VPN and is completely free to start.</p>
+      </div>
+
+      <div class="free-tools">
+
+        <a href="https://kling.kuaishou.com" target="_blank" class="tool-card">
+          <div class="tool-name">KLING AI</div>
+          <div class="tool-desc">Text-to-video & image-to-video. Make 5 second anime clips. Very high quality.</div>
+          <span class="tool-tag">FREE TIER</span>
+        </a>
+
+        <a href="https://runwayml.com" target="_blank" class="tool-card">
+          <div class="tool-name">RUNWAY ML</div>
+          <div class="tool-desc">Gen-3 Alpha. 5 free video credits. Professional anime video generation.</div>
+          <span class="tool-tag">125 FREE CREDITS</span>
+        </a>
+
+        <a href="https://pika.art" target="_blank" class="tool-card">
+          <div class="tool-name">PIKA ART</div>
+          <div class="tool-desc">Great for anime style videos. Animate your images into motion scenes.</div>
+          <span class="tool-tag">FREE PLAN</span>
+        </a>
+
+        <a href="https://hailuoai.com" target="_blank" class="tool-card">
+          <div class="tool-name">HAILUO AI</div>
+          <div class="tool-desc">MiniMax video — 6 sec anime clips. Very realistic motion. Free to use.</div>
+          <span class="tool-tag">FREE</span>
+        </a>
+
+        <a href="https://luma.ai" target="_blank" class="tool-card">
+          <div class="tool-name">LUMA DREAM</div>
+          <div class="tool-desc">Dream Machine — 30 free generations/month. Cinematic quality anime.</div>
+          <span class="tool-tag">30 FREE/MONTH</span>
+        </a>
+
+        <a href="https://animatediff.github.io" target="_blank" class="tool-card">
+          <div class="tool-name">ANIMATEDIFF</div>
+          <div class="tool-desc">100% free, open source. Run locally on your PC. Unlimited anime video.</div>
+          <span class="tool-tag">UNLIMITED FREE</span>
+        </a>
+
+        <a href="https://deforum.art" target="_blank" class="tool-card">
+          <div class="tool-name">DEFORUM</div>
+          <div class="tool-desc">Create anime zoom animations. Great for music videos and art.</div>
+          <span class="tool-tag">FREE</span>
+        </a>
+
+        <a href="https://www.capcut.com" target="_blank" class="tool-card">
+          <div class="tool-name">CAPCUT AI</div>
+          <div class="tool-desc">Anime filter + AI video tools. Works perfectly in India. Very easy.</div>
+          <span class="tool-tag">FREE</span>
+        </a>
+
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">BEST WORKFLOW FOR ANIME VIDEOS</div>
+      <div style="counter-reset:step">
+        <div style="display:flex;gap:16px;margin-bottom:16px;align-items:flex-start">
+          <div style="background:linear-gradient(135deg,var(--pink),var(--purple));width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',monospace;font-size:0.8rem;flex-shrink:0">1</div>
+          <div>
+            <div style="font-size:0.9rem;margin-bottom:4px">Generate anime images here</div>
+            <div style="font-size:0.8rem;color:var(--muted)">Use the Image Generator tab to create your anime characters and scenes.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;margin-bottom:16px;align-items:flex-start">
+          <div style="background:linear-gradient(135deg,var(--pink),var(--purple));width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',monospace;font-size:0.8rem;flex-shrink:0">2</div>
+          <div>
+            <div style="font-size:0.9rem;margin-bottom:4px">Upload to Kling AI or Pika Art</div>
+            <div style="font-size:0.8rem;color:var(--muted)">Use image-to-video to animate your generated anime characters.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;align-items:flex-start">
+          <div style="background:linear-gradient(135deg,var(--pink),var(--purple));width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',monospace;font-size:0.8rem;flex-shrink:0">3</div>
+          <div>
+            <div style="font-size:0.9rem;margin-bottom:4px">Edit in CapCut</div>
+            <div style="font-size:0.8rem;color:var(--muted)">Add music, effects, and subtitles. Export your final anime video.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div class="panel" id="tab-history">
+    <div class="card">
+      <div class="card-title">MY GALLERY</div>
+      <div class="history-grid" id="historyGrid">
+        <div style="text-align:center;color:var(--muted);font-size:0.85rem;grid-column:1/-1;padding:40px">
+          <div style="font-size:2.5rem;margin-bottom:12px;opacity:0.3">🖼️</div>
+          <p>No saved images yet.<br>Generate some anime art and save them!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p>ANIMEFORGE AI — Free forever · Works in India · No sign-up needed</p>
+    <p style="margin-top:6px">Powered by Pollinations.AI · Built with ❤️ for anime creators</p>
+  </div>
+</footer>
+
+<script>
+  let selectedStyle = 'anime';
+  let currentImageUrl = '';
+  let gallery = JSON.parse(localStorage.getItem('animeforge_gallery') || '[]');
+
+  const stylePrompts = {
+    anime: 'anime style, high quality, detailed, vibrant colors',
+    ghibli: 'Studio Ghibli style, soft colors, magical, detailed backgrounds',
+    manga: 'manga style, black and white, detailed linework, screentone',
+    chibi: 'chibi style, cute, big eyes, small body, kawaii',
+    dark: 'dark anime, moody lighting, cinematic, dramatic shadows',
+    mecha: 'mecha anime, robot, mechanical details, dynamic pose, science fiction'
+  };
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach((t,i) => {
+      t.classList.toggle('active', ['image','video','history'][i] === tab);
+    });
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    if(tab === 'history') renderGallery();
+  }
+
+  function selectStyle(el, style) {
+    document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    selectedStyle = style;
+  }
+
+  function addPrompt(text) {
+    const input = document.getElementById('promptInput');
+    input.value = text;
+    input.focus();
+  }
+
+  async function generateImage() {
+    const prompt = document.getElementById('promptInput').value.trim();
+    if(!prompt) {
+      alert('Please enter a prompt first!');
+      return;
+    }
+
+    const neg = document.getElementById('negPrompt').value;
+    const styleAdd = stylePrompts[selectedStyle] || '';
+    const ratio = document.getElementById('ratio').value;
+    const [w, h] = ratio.split('x');
+    const steps = document.getElementById('quality').value;
+    const cfg = document.getElementById('cfgScale').value;
+
+    const fullPrompt = `${prompt}, ${styleAdd}`;
+    const seed = Math.floor(Math.random() * 9999999);
+
+    // Show loader
+    document.getElementById('outputPlaceholder').style.display = 'none';
+    document.getElementById('outputImage').style.display = 'none';
+    document.getElementById('resultActions').style.display = 'none';
+    document.getElementById('loader').classList.add('show');
+
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${w}&height=${h}&seed=${seed}&steps=${steps}&cfg=${cfg}&negative=${encodeURIComponent(neg || 'blurry, low quality, bad anatomy')}&nologo=true`;
+
+    const img = document.getElementById('outputImage');
+    img.onload = () => {
+      document.getElementById('loader').classList.remove('show');
+      img.style.display = 'block';
+      document.getElementById('resultActions').style.display = 'flex';
+      currentImageUrl = url;
+    };
+    img.onerror = () => {
+      document.getElementById('loader').classList.remove('show');
+      document.getElementById('outputPlaceholder').style.display = 'flex';
+      document.getElementById('outputPlaceholder').innerHTML = '<div style="text-align:center;color:#ff6b6b"><div style="font-size:2rem">⚠️</div><p style="margin-top:8px">Generation failed.<br>Check internet & try again.</p></div>';
+    };
+    img.src = url;
+  }
+
+  function downloadImage() {
+    if(!currentImageUrl) return;
+    const a = document.createElement('a');
+    a.href = currentImageUrl;
+    a.download = 'animeforge_' + Date.now() + '.jpg';
+    a.target = '_blank';
+    a.click();
+  }
+
+  function regenerate() {
+    generateImage();
+  }
+
+  function saveToGallery() {
+    if(!currentImageUrl) return;
+    const prompt = document.getElementById('promptInput').value.trim();
+    gallery.unshift({ url: currentImageUrl, prompt: prompt, time: Date.now() });
+    if(gallery.length > 30) gallery.pop();
+    localStorage.setItem('animeforge_gallery', JSON.stringify(gallery));
+    alert('✅ Saved to gallery!');
+  }
+
+  function renderGallery() {
+    const grid = document.getElementById('historyGrid');
+    if(!gallery.length) {
+      grid.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:0.85rem;grid-column:1/-1;padding:40px"><div style="font-size:2.5rem;margin-bottom:12px;opacity:0.3">🖼️</div><p>No saved images yet.<br>Generate some anime art and save them!</p></div>';
+      return;
+    }
+    grid.innerHTML = gallery.map((item, i) => `
+      <div class="history-item" onclick="loadFromGallery(${i})">
+        <img src="${item.url}" alt="anime" loading="lazy">
+        <div class="h-label">${item.prompt.substring(0,40)}...</div>
+      </div>
+    `).join('');
+  }
+
+  function loadFromGallery(i) {
+    const item = gallery[i];
+    document.getElementById('promptInput').value = item.prompt;
+    switchTab('image');
+    const img = document.getElementById('outputImage');
+    img.src = item.url;
+    img.style.display = 'block';
+    document.getElementById('outputPlaceholder').style.display = 'none';
+    document.getElementById('resultActions').style.display = 'flex';
+    currentImageUrl = item.url;
+  }
+</script>
+</body>
+</html>
