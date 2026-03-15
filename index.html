@@ -657,6 +657,17 @@
           <input type="range" min="1" max="15" value="7" oninput="document.getElementById('cfgVal').textContent=this.value" id="cfgScale">
           <div class="range-labels"><span>Realistic</span><span>Creative</span></div>
 
+          <label>AI ENGINE — Choose your generator</label>
+          <div class="style-grid" id="engineGrid">
+            <div class="style-btn active" onclick="selectEngine(this,'pollinations')"><span class="icon">🌸</span>Pollinations</div>
+            <div class="style-btn" onclick="selectEngine(this,'dezgo')"><span class="icon">⚡</span>Dezgo</div>
+            <div class="style-btn" onclick="selectEngine(this,'picfinder')"><span class="icon">🎯</span>PicFinder</div>
+            <div class="style-btn" onclick="selectEngine(this,'prodia')"><span class="icon">🚀</span>Prodia</div>
+          </div>
+          <div id="engineInfo" style="font-size:0.75rem;color:var(--muted);margin-top:8px;padding:8px 12px;background:rgba(0,0,0,0.2);border-radius:8px">
+            🌸 <b style="color:var(--cyan)">Pollinations</b> — Free, no limits, sometimes slow
+          </div>
+
           <button class="btn-generate" onclick="generateImage()">⚡ GENERATE ANIME ART</button>
         </div>
       </div>
@@ -811,6 +822,51 @@
   let refImageBase64 = null;
   let gallery = JSON.parse(localStorage.getItem('animeforge_gallery') || '[]');
 
+  let selectedEngine = 'pollinations';
+
+  const engineInfo = {
+    pollinations: '🌸 <b style="color:var(--cyan)">Pollinations</b> — Free, no limits, sometimes slow',
+    dezgo: '⚡ <b style="color:var(--cyan)">Dezgo</b> — Fast & free, great anime quality',
+    picfinder: '🎯 <b style="color:var(--cyan)">PicFinder</b> — Fast free AI, good for anime',
+    prodia: '🚀 <b style="color:var(--cyan)">Prodia</b> — Super fast, anime specialized models'
+  };
+
+  function selectEngine(el, engine) {
+    document.querySelectorAll('#engineGrid .style-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    selectedEngine = engine;
+    document.getElementById('engineInfo').innerHTML = engineInfo[engine];
+  }
+
+  async function buildImageUrl(fullPrompt, w, h, seed, neg) {
+    if (selectedEngine === 'pollinations') {
+      return `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${w}&height=${h}&seed=${seed}&nologo=true&negative=${encodeURIComponent(neg || 'blurry, low quality')}`;
+    } else if (selectedEngine === 'dezgo') {
+      return `https://dezgo.com/text2image?prompt=${encodeURIComponent(fullPrompt)}&negative_prompt=${encodeURIComponent(neg || 'blurry, low quality')}&width=${w}&height=${h}&seed=${seed}&model=anything_v5`;
+    } else if (selectedEngine === 'picfinder') {
+      return `https://picfinder.ai/api/generate?prompt=${encodeURIComponent(fullPrompt)}&width=${w}&height=${h}&seed=${seed}`;
+    } else if (selectedEngine === 'prodia') {
+      // Prodia: first create job, then poll for result
+      const prodiaRes = await fetch('https://api.prodia.com/v1/job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Prodia-Key': 'free' },
+        body: JSON.stringify({ model: 'anything-v4.0.ckpt [42c97355]', prompt: fullPrompt, negative_prompt: neg || 'blurry, low quality', width: parseInt(w), height: parseInt(h), seed: seed, steps: 20, cfg_scale: 7 })
+      });
+      const prodiaData = await prodiaRes.json();
+      if (prodiaData.job) {
+        // Poll until done
+        for (let i = 0; i < 30; i++) {
+          await new Promise(r => setTimeout(r, 3000));
+          const statusRes = await fetch(`https://api.prodia.com/v1/job/${prodiaData.job}`, { headers: { 'X-Prodia-Key': 'free' } });
+          const statusData = await statusRes.json();
+          if (statusData.status === 'succeeded') return statusData.imageUrl;
+        }
+      }
+      throw new Error('Prodia timeout');
+    }
+    return null;
+  }
+
   function handleRefImage(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -920,13 +976,22 @@
         const blob = await response.blob();
         objectUrl = URL.createObjectURL(blob);
       } else {
-        // Text-to-image normal
-        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${w}&height=${h}&seed=${seed}&nologo=true&negative=${encodeURIComponent(neg || 'blurry, low quality')}`;
-        const response = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeout);
-        if (!response.ok) throw new Error('Failed');
-        const blob = await response.blob();
-        objectUrl = URL.createObjectURL(blob);
+        // Text-to-image with selected engine
+        let imgUrl;
+        if (selectedEngine === 'prodia') {
+          clearTimeout(timeout);
+          imgUrl = await buildImageUrl(fullPrompt, w, h, seed, neg);
+          const imgRes = await fetch(imgUrl);
+          const blob = await imgRes.blob();
+          objectUrl = URL.createObjectURL(blob);
+        } else {
+          imgUrl = await buildImageUrl(fullPrompt, w, h, seed, neg);
+          const response = await fetch(imgUrl, { signal: controller.signal });
+          clearTimeout(timeout);
+          if (!response.ok) throw new Error('Failed');
+          const blob = await response.blob();
+          objectUrl = URL.createObjectURL(blob);
+        }
       }
 
       clearInterval(dotTimer);
